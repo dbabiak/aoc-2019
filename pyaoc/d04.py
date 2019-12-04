@@ -1,4 +1,4 @@
-from aoc.utils import irange
+from pyaoc.utils import irange
 
 def non_decreasing(digits: str) -> bool:
     return all(
