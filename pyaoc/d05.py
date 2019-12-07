@@ -1,104 +1,63 @@
 """
-;_;
+This is completely taken from: https://github.com/0x8b/advent-of-code-2019/blob/master/05.py
 """
 
-from typing import Tuple, NewType, List
+from operator import setitem
 
-Instruction = Tuple[int, int, int, int]
-ADD = 1
-MUL = 2
-IN = 3
-OUT = 4
-JMP_T = 5
-JMP_F = 6
-LT = 7
-EQ = 8
-EXIT = 99
+with open('/home/dmb/aoc-2019/data/d05.txt') as fp:
+    program = [int(x) for x in fp.read().strip().split(',')]
 
-POSITIONAL = 0
-IMMEDIATE = 1
-
-# Instruction Pointer
-IP = NewType('IP', int)
+# neat trick! didn't know you could open self
+# with open(__file__, "r") as f:
+#     c = f.read()
+#     line = c[c.rindex("🎅") + 1 : c.rindex("🐍")].rstrip().split(",")
 
 
-def parse_program(s: str) -> List[int]:
-    return [int(x) for i, x in enumerate(s.strip().split(','))]
+def run(inp):
+    mem = program[:]
+    pc = 0
+    output = []
 
-
-def parse_instruction(i: IP, memory: List[int]) -> Tuple[IP, List[int]]:
-    X = memory[i]
-    op = X % 100
-    n_params = {ADD: 3, MUL: 3, IN: 1, OUT: 1, JMP_T: 2, JMP_F: 2, LT: 3, EQ: 3, EXIT: 0}[op]
-    modes = {i: POSITIONAL if int(mode) == 0 else IMMEDIATE for i, mode in enumerate(reversed(str(X // 100)))}
-    params = []
-
-    for j in range(n_params):
-        val = memory[i + j + 1]
-
-        if op in (ADD, MUL, IN, OUT,) and j + 1 == n_params:
-            params.append(val)
-            break
-
-        mode = modes.get(j, POSITIONAL)
-        param = val if mode == IMMEDIATE else memory[val]
-        params.append(param)
-
-    return IP(i + 1 + len(params)), tuple((op, *params))
-
-
-def diff(xs, ys):
-    return {
-        i: (x, y)
-        for i, (x, y) in enumerate(zip(xs,ys))
-        if x != y
+    d = {
+        1: {"p": 4, "op": lambda a, b, c: setitem(mem, c, a + b)},
+        2: {"p": 4, "op": lambda a, b, c: setitem(mem, c, a * b)},
+        3: {"p": 2, "op": lambda a, b, c: setitem(mem, a, inp)},
+        4: {"p": 2, "op": lambda a, b, c: output.append(mem[a])},
+        5: {"p": 3, "op": lambda a, b, c: b if a != 0 else pc + 3},
+        6: {"p": 3, "op": lambda a, b, c: b if a == 0 else pc + 3},
+        7: {"p": 4, "op": lambda a, b, c: setitem(mem, c, 1 if a < b else 0)},
+        8: {"p": 4, "op": lambda a, b, c: setitem(mem, c, 1 if a == b else 0)},
     }
 
+    while mem[pc] != 99:
+        opcode, *args = mem[pc:][:4]
 
-def compute(memory: List[int], _input=1) -> List[int]:
-    ip = IP(0)
-    output = []
-    while ip < len(memory):
-        next_ip, [op, *params] = parse_instruction(ip, memory)
+        opcode = str(opcode).zfill(5)
+        operation = int(opcode[-2:])
 
-        if op == ADD:
-            a, b, c = params
-            memory[c] = a + b
+        if operation in {1, 2, 5, 6, 7, 8}:
+            if opcode[2] == "0": args[0] = mem[args[0]]
+            if opcode[1] == "0": args[1] = mem[args[1]]
 
-        elif op == MUL:
-            a, b, c = params
-            memory[c] = a * b
+        if 1 <= operation <= 8:
+            o = d[operation]
+            width = o["p"]
+            ret = o["op"](*args)
 
-        elif op == IN:
-            [c] = params
-            memory[c] = _input
+            if operation in {5, 6}:
+                pc = ret
+            else:
+                pc += width
+        else:
+            raise Exception(f"run: unknown opcode {opcode}")
+    return output[-1]
 
-        elif op == OUT:
-            [c] = params
-            output.append(memory[c])
 
-        elif op == JMP_T:
-            a, b = params
-            if a != 0:
-                next_ip = b
+part_one = run(1)
+print(part_one)
+assert part_one == 9654885
 
-        elif op == JMP_F:
-            a, b = params
-            if a == 0:
-                next_ip = b
-
-        elif op == LT:
-            a, b, c = params
-            memory[c] = int(a < b)
-
-        elif op == EQ:
-            a, b, c = params
-            memory[c] = int(a == b)
-
-        elif op == EXIT:
-            break
-
-        ip = next_ip
-
-    return output
+part_two = run(5)
+print(part_two)
+assert part_two == 7079459
 
